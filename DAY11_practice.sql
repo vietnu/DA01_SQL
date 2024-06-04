@@ -20,7 +20,13 @@ FROM activities as a
 JOIN age_breakdown as b
 ON a.user_id=b.user_id
 GROUP BY b.age_bucket
---ex 4
+--ex4
+ SELECT a.customer_id
+FROM customer_contracts as a
+JOIN products as b
+ON a.product_id=b.product_id
+GROUP BY a.customer_id
+having COUNT (DISTINCT b.product_category)=3
 --ex5
 select  t1.employee_id, t1.name,
  count(t2. employee_id ) as reports_count,

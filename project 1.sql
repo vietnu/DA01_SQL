@@ -72,15 +72,23 @@ where QUANTITYORDERED <(select min_value from min_max_value)
 or QUANTITYORDERED >(select max_value from min_max_value)
 
 --c2
-with cte as(
-select *,
-(select avg(QUANTITYORDERED) from SALES_DATASET_RFM_PRJ) as avg_,
-(select stddev(QUANTITYORDERED)from SALES_DATASET_RFM_PRJ)as stdev
-from SALES_DATASET_RFM_PRJ)
-select *,
-(QUANTITYORDERED-avg_)/stdev as z_score
-from cte
-where abs((QUANTITYORDERED-avg_)/stdev)>3
+with cte as
+(SELECT orderdate,QUANTITYORDERED,
+(select avg(QUANTITYORDERED) FROM sales_dataset_rfm_prj) AS avg,
+(select stddev(QUANTITYORDERED) FROM sales_dataset_rfm_prj) AS stddev
+FROM sales_dataset_rfm_prj),
+twt_outliner as(	
+SELECT orderdate,QUANTITYORDERED,(QUANTITYORDERED-avg)/stddev AS z_score
+from cte 
+where ABS ((QUANTITYORDERED-avg)/stddev)>2)
+UPDATE sales_dataset_rfm_prj
+SET QUANTITYORDERED=(select avg(QUANTITYORDERED) FROM sales_dataset_rfm_prj)
+WHERE QUANTITYORDERED IN(SELECT QUANTITYORDERED FROM twt_outliner);
+
+DELETE FROM sales_dataset_rfm_prj
+WHERE QUANTITYORDERED IN(SELECT QUANTITYORDERED FROM twt_outliner)
+
+
 
 
 

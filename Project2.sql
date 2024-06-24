@@ -74,5 +74,65 @@ select DATE(delivered_at ) as date,category,
   group by date,category
   order by date
 
+--II
+---1.
+with cte AS (
+select FORMAT_DATE('%Y-%m', a.created_at) as month, extract(year from a.created_at) as year,b.category,
+round(sum(c.sale_price),2) as TPV,
+count(c.order_id) as TPO,
+round(SUM(b.cost),2) as total_cost
+from bigquery-public-data.thelook_ecommerce.orders as a
+join bigquery-public-data.thelook_ecommerce.products as b on a.order_id=b.id
+join bigquery-public-data.thelook_ecommerce.order_items as c on b.id=c.id
+group by month, year, category
+)
+select *,
+round(((TPV-lag(TPV)over(partition by category order by year, month))/lag(TPV)over(partition by category order by year, month))*100.00,2)||'%' as Revenue_growth,
+round(((TPO-lag(TPO)over(partition by category order by year, month))/lag(TPO)over(partition by category order by year, month))*100.00,2) ||'%' as Order_growth,
+round(TPV-total_cost,2) as total_profit,
+round((TPV-total_cost)/total_cost,2) as Profit_to_cost_ratio
+from cte
+order by category,month, year;
+
+---2.
+WITH t1 AS(
+select user_id, amount,FORMAT_DATE('%Y-%m',first_purchase_date) as cohort_date,
+(extract(year from created_at)-extract(year from first_purchase_date))*12+extract(month from created_at)-extract(month from first_purchase_date)+1 as index
+FROM 
+(select user_id, 
+round(sale_price,2) as amount,
+min(created_at)over (partition by user_id) as first_purchase_date, created_at
+from bigquery-public-data.thelook_ecommerce.order_items)),
+t2 as(
+select cohort_date, index,
+count(distinct user_id) as user_count,
+round(sum(amount),2) as revenue
+from t1
+group by cohort_date,index),
+Customer_cohort as
+(
+select cohort_date,
+Sum(case when index=1 then user_count else 0 end) as m1,
+Sum(case when index=2 then user_count else 0 end) as m2,
+Sum(case when index=3 then user_count else 0 end) as m3,
+Sum(case when index=4 then user_count else 0 end) as m4
+from t2
+Group by cohort_date
+Order by cohort_date),
+retention_cohort as
+(
+Select cohort_date,
+round(100.00* m1/m1,2) || '%' as m1,
+round(100.00* m2/m1,2) || '%' as m2,
+round(100.00* m3/m1,2) || '%' as m3,
+round(100.00* m4/m1,2) || '%' as m4
+from customer_cohort
+)
+Select cohort_date,
+(100.00 - round(100.00* m1/m1,2)) || '%' as m1,
+(100.00 - round(100.00* m2/m1,2)) || '%' as m2,
+(100.00 - round(100.00* m3/m1,2)) || '%' as m3,
+(100.00 - round(100.00* m4/m1,2))|| '%' as m4
+from customer_cohort
 
 
